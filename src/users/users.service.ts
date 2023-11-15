@@ -8,7 +8,8 @@ import { JwtService } from 'src/jwt/jwt.service';
 import { UpdateProfileDto } from './dtos/update-profile.dto';
 import { CommonRes } from 'src/common/dtos/CommonRes.dto';
 import { VerificationEntity } from './entities/verfication.entity';
-import { UserProfileResData, UserProfileResDto } from './dtos/user-profile.dto';
+import { UserProfileResDto } from './dtos/user-profile.dto';
+import { MailService } from 'src/mail/mail.service';
 
 @Injectable()
 export class UserService {
@@ -18,6 +19,7 @@ export class UserService {
     @InjectRepository(VerificationEntity)
     private readonly verificationRepository: Repository<VerificationEntity>,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
   ) {}
 
   async createUser({
@@ -44,6 +46,7 @@ export class UserService {
           user: savedUser,
         });
         await this.verificationRepository.save(verification);
+        this.mailService.sendVerificationEmail(user.email, verification.code);
 
         return { ok: true };
       }
@@ -109,16 +112,17 @@ export class UserService {
     try {
       const { data: user } = await this.findById(userId);
 
-      if (email) user.email = email;
-      if (password) user.password = password;
       if (email || password) {
         user.verification = false;
         const verification = this.verificationRepository.create({ user });
         await this.verificationRepository.save(verification);
+        this.mailService.sendVerificationEmail(user.email, verification.code);
         return {
           ok: true,
         };
       }
+      if (email) user.email = email;
+      if (password) user.password = password;
 
       this.userRepository.save(user);
     } catch (error) {
